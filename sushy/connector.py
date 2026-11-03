@@ -19,10 +19,12 @@ import re
 import ssl
 import time
 from urllib import parse as urlparse
+import uuid
 
 import requests
 from requests.adapters import HTTPAdapter
 from requests import exceptions as req_exc
+from requests_toolbelt.multipart import encoder
 from urllib3.exceptions import InsecureRequestWarning
 
 from sushy import exceptions
@@ -181,6 +183,7 @@ class Connector:
 
     def _op(self, method, path='', data=None, headers=None, blocking=False,
             timeout=None, server_side_retries_left=None, allow_reauth=True,
+            body_factory=None,
             **extra_session_req_kwargs):
         """Generic RESTful request handler.
 
@@ -199,6 +202,8 @@ class Connector:
             will use limit provided by instance's server_side_retries
         :param allow_reauth: Whether to allow refreshing the authentication
             token.
+        :param body_factory: Optional callable returning a fresh streaming
+            multipart body for each attempt, including re-authentication.
         :param extra_session_req_kwargs: Optional keyword argument to pass
          requests library arguments which would pass on to requests session
          object.
@@ -248,13 +253,22 @@ class Connector:
                    'blocking': blocking, 'timeout': timeout,
                    'session': extra_session_req_kwargs})
 
+        retry_kwargs = dict(extra_session_req_kwargs)
+        if body_factory is not None:
+            retry_kwargs['body_factory'] = body_factory
+
         retries = self._server_side_retries or 3
         delay = self._server_side_retries_delay or 2
 
         for attempt in range(retries):
             try:
+                request_data = {'json': data}
+                if body_factory is not None:
+                    body = body_factory()
+                    headers['Content-Type'] = body.content_type
+                    request_data = {'data': body}
                 response = self._session.request(
-                    method, url, json=data,
+                    method, url, **request_data,
                     headers=headers,
                     verify=self._verify,
                     timeout=timeout,
@@ -335,7 +349,7 @@ class Connector:
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
                     allow_reauth=False,
-                    **extra_session_req_kwargs)
+                    **retry_kwargs)
             else:
                 if method == 'GET' and url.endswith('SessionService'):
                     LOG.debug('HTTP GET of SessionService failed %s, '
@@ -361,7 +375,7 @@ class Connector:
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
                     allow_reauth=allow_reauth,
-                    **extra_session_req_kwargs)
+                    **retry_kwargs)
             else:
                 raise
         except exceptions.BadRequestError as e:
@@ -381,7 +395,7 @@ class Connector:
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
                     allow_reauth=allow_reauth,
-                    **extra_session_req_kwargs)
+                    **retry_kwargs)
             else:
                 raise
         except exceptions.NotAcceptableError as e:
@@ -397,7 +411,7 @@ class Connector:
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
                     allow_reauth=allow_reauth,
-                    **extra_session_req_kwargs)
+                    **retry_kwargs)
             else:
                 raise
         if blocking and response.status_code == 202:
@@ -465,6 +479,38 @@ class Connector:
         return self._op('POST', path, data=data, headers=headers,
                         blocking=blocking, timeout=timeout,
                         **extra_session_req_kwargs)
+
+    def post_multipart(self, path, fields, headers=None, blocking=False,
+                       timeout=None):
+        """Stream a multipart POST through the authenticated connector.
+
+        :param path: Sub-URI or absolute URL of the upload resource.
+        :param fields: Mapping of form names to values or
+            (filename, value, content_type) tuples. File values must be
+            seekable binary files; they remain owned by the caller.
+        :param headers: Optional request headers.
+        :param blocking: Whether to wait for an asynchronous operation.
+        :param timeout: Request or blocking-operation timeout in seconds.
+        :returns: The requests response.
+        """
+        positions = []
+        for field in fields.values():
+            value = field[1] if isinstance(field, tuple) else field
+            if hasattr(value, 'read'):
+                position = value.tell()
+                positions.append((value, position))
+        boundary = uuid.uuid4().hex
+
+        def make_body():
+            # MultipartEncoder is consumed by requests and is not seekable.
+            # Rewind the files and rebuild it on every retry.
+            for value, position in positions:
+                value.seek(position)
+            return encoder.MultipartEncoder(fields, boundary=boundary)
+
+        return self._op('POST', path, headers=headers, blocking=blocking,
+                        timeout=timeout, body_factory=make_body,
+                        allow_redirects=False)
 
     def _etag_handler(self, path='', data=None, headers=None, etag=None,
                       blocking=False, timeout=None,

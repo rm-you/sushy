@@ -26,5 +26,7 @@
     },
     "Oem": {},
     "@odata.context": "/redfish/v1/$metadata#UpdateService.UpdateService",
-    "@odata.id": "/redfish/v1/UpdateService"
+    "@odata.id": "/redfish/v1/UpdateService",
+    "MultipartHttpPushUri": "/redfish/v1/UpdateService/upload",
+    "MaxImageSizeBytes": 1048576
 }

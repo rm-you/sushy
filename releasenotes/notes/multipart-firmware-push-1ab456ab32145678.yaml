@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Adds ``UpdateService.multipart_update`` for streaming Redfish multipart
+    HTTP push firmware updates, including explicit targets, OEM parameters,
+    operation apply time and force-update policy. Uploads use the authenticated
+    connector and replay the complete image after retries or session refresh.
