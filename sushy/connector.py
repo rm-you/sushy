@@ -360,6 +360,7 @@ class Connector:
                     method, path, data=data, headers=headers,
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
+                    allow_reauth=allow_reauth,
                     **extra_session_req_kwargs)
             else:
                 raise
@@ -379,6 +380,7 @@ class Connector:
                     method, path, data=data, headers=headers,
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
+                    allow_reauth=allow_reauth,
                     **extra_session_req_kwargs)
             else:
                 raise
@@ -394,6 +396,7 @@ class Connector:
                     method, path, data=data, headers=headers,
                     blocking=blocking, timeout=timeout,
                     server_side_retries_left=server_side_retries_left,
+                    allow_reauth=allow_reauth,
                     **extra_session_req_kwargs)
             else:
                 raise
