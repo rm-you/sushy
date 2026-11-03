@@ -58,7 +58,7 @@ class UpdateService(base.ResourceBase):
     status = common.StatusField('Status')
     """The status of the update service"""
 
-    _actions = ActionsField('Actions', required=True)
+    _actions = ActionsField('Actions')
 
     _firmware_inventory_path = base.Field(['FirmwareInventory', '@odata.id'])
 
@@ -81,7 +81,8 @@ class UpdateService(base.ResourceBase):
             registries=registries, root=root)
 
     def _get_simple_update_element(self):
-        simple_update_action = self._actions.simple_update
+        simple_update_action = (self._actions.simple_update
+                                if self._actions else None)
         if not simple_update_action:
             raise exceptions.MissingAttributeError(
                 attribute='#UpdateService.SimpleUpdate',
