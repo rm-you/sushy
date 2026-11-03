@@ -53,9 +53,10 @@ class UpdateServiceTestCase(base.TestCase):
 
     def test__parse_attributes_missing_actions(self):
         self.upd_serv.json.pop('Actions')
+        self.upd_serv._parse_attributes(self.json_doc)
         self.assertRaisesRegex(
-            exceptions.MissingAttributeError, 'attribute Actions',
-            self.upd_serv._parse_attributes, self.json_doc)
+            exceptions.MissingActionError, 'SimpleUpdate',
+            self.upd_serv.simple_update, 'https://example.com/firmware.bin')
 
     def test_simple_update(self):
         with open('sushy/tests/unit/json_samples/task_monitor.json') as f:
