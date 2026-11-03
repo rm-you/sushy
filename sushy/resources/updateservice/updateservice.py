@@ -84,7 +84,7 @@ class UpdateService(base.ResourceBase):
         simple_update_action = self._actions.simple_update
         if not simple_update_action:
             raise exceptions.MissingAttributeError(
-                action='#UpdateService.SimpleUpdate',
+                attribute='#UpdateService.SimpleUpdate',
                 resource=self._path)
         return simple_update_action
 
