@@ -351,3 +351,30 @@ For the OEM extension example, presently, both of the emulators
 (static/dynamic) do not expose any OEM; as a result, users may need to add
 manually some OEM resources to emulators' templates. It may be easier to
 start with a static emulator.
+
+Multipart firmware push
+-----------------------
+
+Use ``UpdateService.multipart_http_push_uri`` to discover multipart push
+support. ``multipart_update`` streams a binary image through the connector's
+authenticated session and returns a task monitor::
+
+    with open('firmware.bin', 'rb') as image:
+        monitor = update_service.multipart_update(
+            image, targets=['/redfish/v1/UpdateService/FirmwareInventory/BMC'],
+            oem_parameters={'ImageType': 'BMC'})
+
+The image may also be a file path. Caller-supplied files must be seekable and
+remain open. ``UpdateParameters`` is always sent as JSON. ``OemParameters``
+is optional JSON supplied by the caller. No vendor configuration is changed.
+``apply_time`` accepts a ``sushy.ApplyTime`` value, while ``force_update``
+requests a BMC policy override, such as permitting a downgrade. The BMC may
+still enforce policies. Advertised ``MaxImageSizeBytes`` is checked locally.
+
+The connector sends the image again after a session refresh or a BMC
+answer that asks for a retry. After a connection error or timeout, it sends
+the image again only if the connection was never made, since the BMC may
+have received it and be applying it.
+
+See the `Redfish multipart HTTP push specification
+<https://redfish.dmtf.org/schemas/DSP0266_1.20.1.html>`_.

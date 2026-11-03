@@ -14,11 +14,15 @@
 # This is referred from Redfish standard schema.
 # https://redfish.dmtf.org/schemas/UpdateService.v1_2_2.json
 
+import contextlib
+import json
 import logging
+import os
 
 from sushy import exceptions
 from sushy.resources import base
 from sushy.resources import common
+from sushy.resources import constants as res_cons
 from sushy.resources.updateservice import constants as up_cons
 from sushy.resources.updateservice import softwareinventory
 from sushy import taskmonitor
@@ -36,6 +40,12 @@ class UpdateService(base.ResourceBase):
 
     identity = base.Field('Id', required=True)
     """The update service identity"""
+
+    multipart_http_push_uri = base.Field('MultipartHttpPushUri')
+    """The URI for multipart HTTP push firmware updates."""
+
+    max_image_size_bytes = base.Field('MaxImageSizeBytes', adapter=int)
+    """Maximum supported firmware image size in bytes, if advertised."""
 
     http_push_uri = base.Field('HttpPushUri')
     """The URI used to perform an HTTP or HTTPS push update to the Update
@@ -155,6 +165,63 @@ class UpdateService(base.ResourceBase):
         return taskmonitor.TaskMonitor.from_response(
             self._conn, rsp, target_uri,
             redfish_version=self.redfish_version, registries=self.registries)
+
+    def multipart_update(self, image, targets=None, oem_parameters=None,
+                         apply_time=None, force_update=None):
+        """Push a firmware image using Redfish multipart HTTP update.
+
+        :param image: File path or seekable binary file, read from its start.
+            Caller-supplied files remain open after the request.
+        :param targets: Optional list of Redfish resource URIs to update.
+        :param oem_parameters: Optional JSON object for the OemParameters part.
+        :param apply_time: Optional :py:class:`sushy.ApplyTime` value.
+        :param force_update: Optional request to bypass update policy, e.g.
+            to allow a downgrade. The BMC decides which policies to bypass.
+        :returns: A task monitor.
+        :raises: MissingAttributeError if multipart push is not advertised.
+        """
+        uri = self.multipart_http_push_uri
+        if not uri:
+            raise exceptions.MissingAttributeError(
+                attribute='MultipartHttpPushUri', resource=self._path)
+        parameters = {}
+        if targets is not None:
+            parameters['Targets'] = targets
+        if apply_time is not None:
+            parameters['@Redfish.OperationApplyTime'] = (
+                res_cons.ApplyTime(apply_time).value)
+        if force_update is not None:
+            parameters['ForceUpdate'] = force_update
+
+        with contextlib.ExitStack() as stack:
+            if isinstance(image, str | bytes | os.PathLike):
+                image = stack.enter_context(open(image, 'rb'))
+            image.seek(0, os.SEEK_END)
+            size = image.tell()
+            image.seek(0)
+            if (self.max_image_size_bytes is not None
+                    and size > self.max_image_size_bytes):
+                raise exceptions.InvalidParameterValueError(
+                    parameter='image size', value=size,
+                    valid_values=f'at most {self.max_image_size_bytes} bytes')
+            name = getattr(image, 'name', 'firmware.bin')
+            filename = (os.path.basename(os.fsdecode(name))
+                        if isinstance(name, str | bytes | os.PathLike)
+                        else 'firmware.bin')
+            fields = {
+                'UpdateParameters': (None, json.dumps(parameters),
+                                     'application/json'),
+            }
+            if oem_parameters is not None:
+                fields['OemParameters'] = (
+                    None, json.dumps(oem_parameters), 'application/json')
+            fields['UpdateFile'] = (filename, image,
+                                    'application/octet-stream')
+            rsp = self._conn.post_multipart(uri, fields=fields)
+
+        return taskmonitor.TaskMonitor.from_response(
+            self._conn, rsp, uri, redfish_version=self.redfish_version,
+            registries=self.registries)
 
     def get_task_monitor(self, task_monitor):
         """Used to retrieve a TaskMonitor.

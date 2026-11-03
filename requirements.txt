@@ -4,5 +4,6 @@
 
 pbr>=6.0.0 # Apache-2.0
 requests>=2.14.2 # Apache-2.0
+requests-toolbelt>=1.0.0 # Apache-2.0
 python-dateutil>=2.7.0 # BSD
 stevedore>=1.29.0 # Apache-2.0
