@@ -1,0 +1,9 @@
+---
+fixes:
+  - |
+    ``UpdateService.get_allowed_transfer_protocols()`` and
+    ``UpdateService.simple_update()`` now raise ``MissingActionError`` when
+    the service has no ``#UpdateService.SimpleUpdate`` action. The docstrings
+    said ``MissingAttributeError``, but building that exception failed, so
+    callers got a ``KeyError`` instead. Code that catches either for this
+    case needs to catch ``MissingActionError``.

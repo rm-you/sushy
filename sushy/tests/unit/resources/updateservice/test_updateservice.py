@@ -190,6 +190,13 @@ class UpdateServiceTestCase(base.TestCase):
             self.upd_serv.redfish_version,
             self.upd_serv._registries, self.upd_serv.root)
 
+    def test_missing_simple_update_raises_action_error(self):
+        self.json_doc['Actions'].pop('#UpdateService.SimpleUpdate')
+        self.upd_serv._parse_attributes(self.json_doc)
+        self.assertRaisesRegex(
+            exceptions.MissingActionError, 'SimpleUpdate',
+            self.upd_serv.simple_update, 'https://example.com/firmware.bin')
+
 
 class UpdateServiceNoInvTestCase(base.TestCase):
 

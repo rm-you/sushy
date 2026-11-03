@@ -83,7 +83,7 @@ class UpdateService(base.ResourceBase):
     def _get_simple_update_element(self):
         simple_update_action = self._actions.simple_update
         if not simple_update_action:
-            raise exceptions.MissingAttributeError(
+            raise exceptions.MissingActionError(
                 action='#UpdateService.SimpleUpdate',
                 resource=self._path)
         return simple_update_action
@@ -102,8 +102,8 @@ class UpdateService(base.ResourceBase):
         """Get the allowed values for transfer protocol.
 
         :returns: A set of allowed values.
-        :raises: MissingAttributeError, if Actions/#UpdateService.SimpleUpdate
-            attribute not present.
+        :raises: MissingActionError, if Actions/#UpdateService.SimpleUpdate
+            action not present.
         """
         simple_update_action = self._get_simple_update_element()
 
